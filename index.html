@@ -1,0 +1,468 @@
+<html>
+    <head>
+        <style>
+        .impLabel {
+            font-family: fantasy;
+            font-size: 22
+        }
+        .checkBox {
+            box-sizing: border-box;
+            width: 50;
+        }
+        .interLabel {
+            font-family: cursive;
+            font-size: 20;
+            color: crimson
+        }
+        #ghost {
+            max-width: 30;
+            height: auto
+        }
+        #ghostInline {
+            max-width: 25;
+            height: auto
+        }
+        #brake {
+            max-width: 30;
+            height: auto
+        }
+        #brakeInline {
+            max-width: 25;
+            height: auto
+        }
+        #stasisIcon {
+            max-width: 25;
+            height: auto
+        }
+        #stasisInline {
+            max-width: 20;
+            height: auto
+        }        
+        </style>
+    </head>
+	<body>
+        <div>
+            <h3>
+                Collisions Avast!
+            </h3>
+            <p>
+                A game I made to practice my Javascript development efforts. Also has some rudimentary but accurate enough physics modeling. Give it a try!
+            </p>
+            <p>
+                Rules are simple: The black ball should hit the other balls in order, starting from 1, then 2 and going on as long as one can. There is no penalty for hitting other balls while attempting this but the time may run out.  
+            </p>
+            <p>
+                You can control the balls trajectory by placing a gravity vortex anywhere on the sky. It will attract all the balls to itself; closer the ball, stronger the attraction. 
+            </p>
+            <p>
+                There are special powers with cooldowns at your disposal. You can make all balls temporarily ghost like and they will pass through anything without colliding. Just press <b>A</b> when you see the Ghost <img src="ghost.jpg" id="ghostInline" class="" /> icon. Or you can try an emergency slow down by pressing <b>S</b> when you see the break <img src="brake.jpg" id="brakeInline" class="" /> icon. Finally, you can place a stasis trap, that will freeze a ball in its tracks. Press <b>D</b> when you see the stasis <img src="stasis.jpg" id="stasisInline" class=""/> icon. 
+            </p>
+            <p>
+                Keep in mind that the black ball is heavier. Good luck and have fun!
+            </p>
+        </div>
+        <div>
+            <button id="startButton" class="button" onclick="StartGame()" name="StartButton">Start</button>
+            <button id="resettButton" class="button" onclick="ResetGame()" name="ResetButton">Reset</button>
+        </div>
+        <div>
+	    <canvas tabindex="1" id="motionCanvas" width="400" height="300" style="border:1px solid #d3d3d3;">
+        </canvas>
+        </div>
+<!--
+        <div>
+        <input id="magCheckBox" class="checkBox" onclick="MagneticBox()" name="MagInt" type="checkbox"/>
+        <label class="interLabel">Interball Attraction</label>
+        </div>
+-->
+        <div>
+        <label id="timeLabel" class="impLabel">Time Left: 30</label>
+        <label id="scoreLabel" class="impLabel">Score : 0</label>    
+        <img src="ghost.jpg" id="ghost" class="" />
+        <img src="brake.jpg" id="brake" class="" />
+        <img src="stasis.jpg" id="stasisIcon" class="" />
+        </div>
+        <script src="scripts/vector.js"></script>
+        <script src="scripts/ball.js"></script>
+        <script src="scripts/container.js"></script>
+        <script>
+            //alert("Aim of the game is to avoid balls colliding with one another.\n You achieve this by placing the attractor (black rectangle).");
+            //alert("Turning on interball interaction will make life more difficult but will increase your score!");
+            
+            var magneticInteraction = false;
+            var gameOver=false;
+            var gameStarted = false;
+            var mouseX=0.0;
+            var mouseY=0.0;
+            var stasisDropped = false;
+            var stasisX = 0.0;
+            var stasisY = 0.0;
+            var ghostTimer = 0;
+            var stasisTimer = 0;
+            var stasisCounter=0;
+            var brakeTimer = 0;
+            var successNum = 1;
+            var can = document.getElementById("motionCanvas");
+            var lll = document.getElementById("timeLabel");
+            var scl = document.getElementById("scoreLabel");
+            var gho = document.getElementById("ghost");
+            var bra = document.getElementById("brake");
+            var sts = document.getElementById("stasisIcon");
+            var gravWellSize=10;
+            var deltaSize=0.1;
+            var imageObj = new Image();
+            imageObj.src="gravWell.jpg";
+            var backImg = new Image();
+            backImg.src = "galaxy.jpg";
+            var stasis = new Image();
+            stasis.src = "stasis.jpg";
+            can.addEventListener("mousedown",CanvasMouseDown,true);
+            can.addEventListener( "keydown", CanvasKeyDown, true);
+            can.addEventListener("mousemove", CanvasMouseMove, true);
+            //var livesLeft=5;
+            var timeLeft= 30;
+            var score=0;
+            var roundedScore=0;
+            var ballAddCounter=0;
+            var lastBallCounter=0;
+            var timeToAddBall=false;
+            var ctx;
+            var numBalls;
+            var att = new Vector(200,150);
+            var cc = new Container(0,0,400,300);
+            if(can.getContext){
+                ctx=can.getContext("2d");
+                ctx.drawImage(backImg,0,0,400,300);
+                
+                PlaceBalls();
+                DrawBalls();
+                
+                var intervalID = window.setInterval(function(){
+                
+                    if(gameStarted && !gameOver){
+                        if(ghostTimer > 0) {
+                            gho.style.visibility = 'hidden';
+                            ghostTimer--;
+                        } else {
+                            gho.style.visibility = 'visible';
+                        }
+                        if(brakeTimer > 0) {
+                            bra.style.visibility = 'hidden';
+                            brakeTimer--;
+                        } else {
+                            bra.style.visibility = 'visible';
+                        }
+                        if(stasisTimer>0){
+                            sts.style.visibility = 'hidden';
+                            stasisTimer--;
+                            if(stasisCounter>0){
+                                stasisCounter--;
+                            }
+                        } else {
+                             sts.style.visibility = 'visible';
+                        }
+                        ctx.drawImage(backImg,0,0,400,300);
+                        if(stasisDropped) {
+                            if(stasisCounter<1){
+                                stasisDropped=false;
+                            }
+                            DrawStasis();
+                        }
+                        PullTowardsAtt();
+                        CheckForStasisTrap();
+                        MoveBalls();
+                        if(gravWellSize>13){
+                            deltaSize = -0.1;
+                        } else if(gravWellSize<7){
+                            deltaSize = 0.1;
+                        }
+                        gravWellSize += deltaSize;
+                        DrawAtt();
+                        DrawBalls();
+                        score += 0.01;
+                        ballAddCounter++;
+                        if(ballAddCounter>(lastBallCounter + numBalls*1200)){
+                            lastBallCounter = ballAddCounter;
+                            ballAddCounter=0;
+                            AddBall();
+                        }
+                        if(timeToAddBall){
+                            timeToAddBall=false;
+                            AddBall();
+                        }
+                        lll.textContent="Time Left: "+Math.round(timeLeft);
+                        roundedScore = Math.round(score/10)*10;
+                        scl.textContent="Score: "+roundedScore;
+                        timeLeft -= (0.005+ numBalls*0.001);
+                        if(timeLeft<1) {
+                            //clearInterval(intervalID);
+                            gameOver=true;
+                            alert("Game over! Your score was: "+roundedScore);
+                        }
+                    }
+                },10);
+                
+            }
+            
+            function MagneticBox() {
+                magneticInteraction = !magneticInteraction;
+            }
+            
+            function CanvasMouseDown(event) {
+                var rect = can.getBoundingClientRect();
+                var eX = event.clientX-rect.left;
+                var eY= event.clientY-rect.top;
+                att.X=eX;
+                att.Y=eY;
+            }
+            
+            function CanvasMouseMove(event) {
+                var rect = can.getBoundingClientRect();
+                mouseX = event.clientX-rect.left;;
+                mouseY = event.clientY-rect.top;;
+            }
+            
+            function CanvasKeyDown(event) {
+                
+                if(event.keyCode == 65) { // Pressed A, Ghost button
+                    if(ghostTimer <1 ){
+                        ghostTimer = 800;
+                        Ghost(true);
+                    }
+                }
+                
+                if(event.keyCode == 83) { // Pressed S, Brake button
+                    if(brakeTimer <1 ){
+                        brakeTimer = 800;
+                        SlowBalls();
+                    }
+                }
+                
+                if(event.keyCode == 68) { // Pressed D, Stasis Trap button
+                    if(stasisTimer<1){
+                        stasisX = mouseX;
+                        stasisY = mouseY;
+                        stasisDropped=true;
+                        stasisTimer=800;
+                        stasisCounter=500;
+                    }
+                }
+                
+            }
+            
+            function Ghost(g){
+                cc.Balls.forEach(function(it,indx){
+                                    it.SetFlying(g);
+                            }
+                            )
+            }
+            
+            function SlowBalls(){
+                cc.Balls.forEach(function(it,indx){
+                                    it.SetVel(it.Vel.Mult(0.5));
+                            }
+                            )
+            }
+            
+            function CheckForStasisTrap(){
+                if(stasisDropped){
+                cc.Balls.forEach(function(it,indx){
+                                var ds = new Vector(it.X - stasisX, it.Y - stasisY);
+                                if(ds.Length()<12){
+                                    stasisDropped=false;
+                                    it.SetVel(new Vector(0,0));
+                                }
+                            }   
+                        )
+                }
+            }
+            
+            function PullTowardsAtt(){
+                cc.Balls.forEach(function(b,ind){
+                    var ed = new Vector(b.X-att.X,b.Y-att.Y);
+                    var eMag = Math.min(1,100.0 / Math.pow(ed.Length(),2.0));
+                    var eForce = ed.UnitVector().Mult(-1*eMag);
+                    b.SetVel(b.Vel.Add(eForce));
+                }
+                )
+            }
+            
+            function MoveBalls() {
+                cc.BounceFromWalls();
+                    cc.BounceFromOtherBalls();
+                    if(magneticInteraction){
+                        cc.MagneticInteraction();
+                    }
+                    cc.Balls.forEach(function(item,index){
+                                        item.Propagate(0.2);
+                                    }
+                     )
+            }
+            
+            function DrawAtt() {
+                ctx.drawImage(imageObj,att.X-gravWellSize/2, att.Y-gravWellSize/2,gravWellSize,gravWellSize);
+            }
+            
+            function DrawStasis() {
+                ctx.drawImage(stasis,stasisX-9,stasisY-9,18,18);
+            }
+            
+            function DrawBalls() {
+                cc.Balls.forEach(function(item,index){
+                            if(item.BallNum>0){
+                                        ctx.beginPath();
+                                        ctx.arc(item.X,item.Y,10,0,360);
+                                        ctx.closePath();
+                                        var fsBall;
+                                        var fsNum = "White";
+                                        var rem = index - Math.floor(index/7.0)*7;
+                                        switch(rem){
+                                            case 1: 
+                                                //ctx.fillStyle="Red";
+                                                fsBall = "Red";
+                                                break;
+                                            case 2:
+                                                //ctx.fillStyle="Green";
+                                                fsBall = "Green";
+                                                break;
+                                            case 3:
+                                                //ctx.fillStyle="Brown";
+                                                fsBall = "Brown";
+                                                break;
+                                            case 4:
+                                                //ctx.fillStyle="Yellow";
+                                                fsBall = "Yellow";
+                                                fsNum = "Black";
+                                                break;
+                                            case 5:
+                                                //ctx.fillStyle="Orange";
+                                                fsBall = "Orange";
+                                                fsNum = "Black";
+                                                break;
+                                            case 6:
+                                                //ctx.fillStyle="Pink";
+                                                fsBall = "Pink";
+                                                fsNum = "Black";
+                                                break;
+                                            default:
+                                                //ctx.fillStyle="Blue";
+                                                fsBall = "Blue";
+                                                break;
+                                        }
+                                        ctx.fillStyle = fsBall;
+                                        if(item.Flying)
+                                        {
+                                            ctx.fillStyle="White";
+                                            fsNum = "Black";
+                                        }
+                                        ctx.fill();
+                                        var trailPoints = item.Trail;
+                                        trailPoints.forEach(function(p,ind){
+                                                                ctx.beginPath();
+                                                                ctx.arc(p.X,p.Y,1,0,360);
+                                                                ctx.closePath();
+                                                                ctx.fill();
+                                                            }
+                                                           )
+                                        ctx.fillStyle=fsNum;
+                                        ctx.font = "15px comic bold";
+                                        ctx.fillText(item.BallNum,item.X-4,item.Y+4,10);
+                                        if(item.BallNum == successNum) {
+                                            ctx.beginPath();
+                                            ctx.arc(item.X,item.Y,8,0,360);
+                                            ctx.closePath();
+                                            ctx.strokeStyle=fsNum;
+                                            ctx.stroke();
+                                        }
+                                      
+                             } else {
+                                ctx.beginPath();
+                                ctx.arc(item.X,item.Y,10,0,360);
+                                ctx.closePath();
+                                ctx.fillStyle="Black";
+                                ctx.fill();
+                                ctx.beginPath();
+                                ctx.arc(item.X,item.Y,4,0,360);
+                                ctx.closePath();
+                                ctx.fillStyle="White";
+                                ctx.fill();
+                                ctx.fillStyle="Black";
+                                var trailPoints = item.Trail;
+                                trailPoints.forEach(function(p,ind){
+                                            ctx.beginPath();
+                                            ctx.arc(p.X,p.Y,1,0,360);
+                                            ctx.closePath();
+                                            ctx.fill();
+                                        }
+                                       )
+                             }
+                        }
+                     )
+                }
+                
+            
+            
+            
+            
+            function AddBall() {
+                numBalls++;
+                if(numBalls>8){
+                    if(cc.Balls[0].BallNum == 0) {
+                        var spb = cc.Balls[0];
+                        cc.Balls.shift();
+                        cc.AddBall(spb);
+                    } 
+                    else {
+                        cc.Balls.shift();
+                    }
+                }
+                var vx = -2 + Math.random()*4;
+                var vy = -2 + Math.random()*4;
+                
+                var vel = new Vector(vx,vy);
+                var bNew = new Ball(200+Math.random()*40,150+Math.random()*40,numBalls-1,vel);
+                cc.AddBall(bNew);
+                
+            }
+            
+            function PlaceBalls() {
+                    var spBall = new Ball(205,140, 0, new Vector(0.01,0.01));
+                    spBall.Mass=1.75;
+                    var b1 = new Ball(100+Math.random()*50,50+Math.random()*45,1,new Vector(-2 + Math.random()*4,-2 + Math.random()*4));
+                    var b2 = new Ball(280+Math.random()*60,160+Math.random()*60,2,new Vector(-2 + Math.random()*4,-2 + Math.random()*4));
+                    //var b3 = new Ball(80+Math.random()*40,200+Math.random()*40,3,new Vector(-2 + Math.random()*4,-2 + Math.random()*4));
+                    //var b4 = new Ball(330+Math.random()*40,200+Math.random()*40,4,new Vector(-2 + Math.random()*4,-2 + Math.random()*4));
+
+                    
+                    cc.AddBall(spBall);
+                    cc.AddBall(b1);
+                    cc.AddBall(b2);
+                    //cc.AddBall(b3);
+                    //cc.AddBall(b4);
+                    numBalls = 3;
+                }
+            
+            function StartGame() {
+                gameStarted=true;
+            }
+            
+            function ResetGame() {
+                gameOver=false;
+                gameStarted=false;
+                numBalls=0;
+                ghostTimer=0;
+                brakeTimer=0;
+                stasisTimer=0;
+                ballAddCounter = 0;
+                lastBallCounter = 0;
+                successNum = 1;
+                timeLeft=30;
+                score=0;
+                cc = new Container(0,0,400,300);
+                PlaceBalls();
+                gameStarted=true;
+            }
+            
+        </script>
+	</body>
+</html>
